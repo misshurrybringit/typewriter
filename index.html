@@ -42,16 +42,30 @@ inner.style.visibility = "visible";
 const totalShift = Math.max(0, fullHeight - vh);
 
 let currentShift = 0;
+let typed = "";
 let i = 0;
 let canScroll = true;
 
 function maybeScroll() {
-  if (!canScroll || currentShift >= totalShift) return;
+  if (!canScroll) return;
+  // always measure live
+  const liveVh = window.innerHeight;
+  inner.style.visibility = "hidden";
+  const savedTransform = inner.style.transform;
+  inner.style.transform = "translateY(0)";
+  inner.textContent = text;
+  const liveFullHeight = inner.offsetHeight;
+  inner.textContent = typed;
+  inner.style.transform = savedTransform;
+  inner.style.visibility = "visible";
+  const liveTotalShift = Math.max(0, liveFullHeight - liveVh);
+  if (currentShift >= liveTotalShift) return;
   const textBottom = inner.getBoundingClientRect().bottom;
-  const spaceBelow = vh - textBottom;
-  if (spaceBelow < trigger) {
-    const remaining = totalShift - currentShift;
-    const move = Math.min(chunk, remaining);
+  if (textBottom < liveVh * 0.5) return;
+  const spaceBelow = liveVh - textBottom;
+  if (spaceBelow < Math.round(liveVh * 0.35)) {
+    const remaining = liveTotalShift - currentShift;
+    const move = Math.min(Math.round(liveVh * 0.4), remaining);
     if (move <= 0) return;
     currentShift += move;
     canScroll = false;
@@ -63,7 +77,8 @@ function maybeScroll() {
 
 function type() {
   if (i < text.length) {
-    inner.textContent += text[i];
+    typed += text[i];
+    inner.textContent = typed;
     i++;
     maybeScroll();
     setTimeout(type, 43);
@@ -75,6 +90,7 @@ function type() {
 function restart() {
   inner.style.transition = "none";
   inner.style.transform = "translateY(0)";
+  typed = "";
   inner.textContent = "";
   currentShift = 0;
   i = 0;
