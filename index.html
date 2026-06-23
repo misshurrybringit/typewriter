@@ -83,6 +83,22 @@ function type() {
     maybeScroll();
     setTimeout(type, 43);
   } else {
+    // snap to exact end position
+    const liveVh = window.innerHeight;
+    inner.style.visibility = "hidden";
+    const savedTransform = inner.style.transform;
+    inner.style.transform = "translateY(0)";
+    inner.textContent = text;
+    const liveFullHeight = inner.offsetHeight;
+    inner.textContent = typed;
+    inner.style.transform = savedTransform;
+    inner.style.visibility = "visible";
+    const liveTotalShift = Math.max(0, liveFullHeight - liveVh);
+    if (liveTotalShift > currentShift) {
+      currentShift = liveTotalShift;
+      inner.style.transition = "transform 0.5s ease";
+      inner.style.transform = `translateY(-${currentShift}px)`;
+    }
     setTimeout(restart, restartDelay);
   }
 }
