@@ -10,7 +10,6 @@ html, body { margin: 0; padding: 0; font-family: "Times New Roman", serif; }
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
   overflow: hidden;
-  padding: 0 12px;
   box-sizing: border-box;
 }
 #inner {
@@ -28,46 +27,75 @@ const text = `The year after 9/11 I started commuting alone to middle school in 
 
 const inner = document.getElementById("inner");
 const restartDelay = 20 * 1000;
-const vh = window.innerHeight;
-const chunk = Math.round(vh * 0.4);
-const trigger = Math.round(vh * 0.35);
-
-// Pre-measure full text height
-inner.style.visibility = "hidden";
-inner.textContent = text;
-const fullHeight = inner.offsetHeight;
-inner.textContent = "";
-inner.style.visibility = "visible";
-
-const totalShift = Math.max(0, fullHeight - vh);
 
 let currentShift = 0;
 let typed = "";
 let i = 0;
 let canScroll = true;
+let userScrolled = false;
+let userScrollTimeout = null;
 
-function maybeScroll() {
-  if (!canScroll) return;
-  // always measure live
-  const liveVh = window.innerHeight;
-  inner.style.visibility = "hidden";
+function setUserScrolled() {
+  userScrolled = true;
+  clearTimeout(userScrollTimeout);
+  userScrollTimeout = setTimeout(() => { userScrolled = false; }, 5000);
+}
+
+// Manual scroll via wheel
+let touchStartY = 0;
+let autoShift = 0; // track where auto-scroll last put us
+
+window.addEventListener("wheel", (e) => {
+  const newShift = Math.max(0, currentShift + e.deltaY * 0.5);
+  if (newShift < autoShift) setUserScrolled();
+  else userScrolled = false;
+  currentShift = newShift;
+  inner.style.transition = "none";
+  inner.style.transform = `translateY(-${currentShift}px)`;
+}, { passive: true });
+window.addEventListener("touchstart", (e) => {
+  touchStartY = e.touches[0].clientY;
+}, { passive: true });
+window.addEventListener("touchmove", (e) => {
+  const delta = touchStartY - e.touches[0].clientY;
+  touchStartY = e.touches[0].clientY;
+  const newShift = Math.max(0, currentShift + delta);
+  if (newShift < autoShift) setUserScrolled();
+  else userScrolled = false;
+  currentShift = newShift;
+  inner.style.transition = "none";
+  inner.style.transform = `translateY(-${currentShift}px)`;
+}, { passive: true });
+
+// Measure how far total shift needs to be for full text at current window size
+function getTotalShift() {
   const savedTransform = inner.style.transform;
+  const savedText = inner.textContent;
+  inner.style.transition = "none";
   inner.style.transform = "translateY(0)";
+  inner.style.visibility = "hidden";
   inner.textContent = text;
-  const liveFullHeight = inner.offsetHeight;
-  inner.textContent = typed;
+  const fullHeight = inner.offsetHeight;
+  inner.textContent = savedText;
   inner.style.transform = savedTransform;
   inner.style.visibility = "visible";
-  const liveTotalShift = Math.max(0, liveFullHeight - liveVh);
-  if (currentShift >= liveTotalShift) return;
+  return Math.max(0, fullHeight - window.innerHeight);
+}
+
+function maybeScroll() {
+  if (!canScroll || userScrolled) return;
+  const totalShift = getTotalShift();
+  if (currentShift >= totalShift) return;
   const textBottom = inner.getBoundingClientRect().bottom;
-  if (textBottom < liveVh * 0.5) return;
-  const spaceBelow = liveVh - textBottom;
-  if (spaceBelow < Math.round(liveVh * 0.35)) {
-    const remaining = liveTotalShift - currentShift;
-    const move = Math.min(Math.round(liveVh * 0.4), remaining);
+  const vh = window.innerHeight;
+  if (textBottom < vh * 0.5) return;
+  const spaceBelow = vh - textBottom;
+  if (spaceBelow < vh * 0.35) {
+    const remaining = totalShift - currentShift;
+    const move = Math.min(Math.round(vh * 0.4), remaining);
     if (move <= 0) return;
     currentShift += move;
+    autoShift = currentShift;
     canScroll = false;
     inner.style.transition = "transform 0.5s ease";
     inner.style.transform = `translateY(-${currentShift}px)`;
@@ -83,19 +111,10 @@ function type() {
     maybeScroll();
     setTimeout(type, 43);
   } else {
-    // snap to exact end position
-    const liveVh = window.innerHeight;
-    inner.style.visibility = "hidden";
-    const savedTransform = inner.style.transform;
-    inner.style.transform = "translateY(0)";
-    inner.textContent = text;
-    const liveFullHeight = inner.offsetHeight;
-    inner.textContent = typed;
-    inner.style.transform = savedTransform;
-    inner.style.visibility = "visible";
-    const liveTotalShift = Math.max(0, liveFullHeight - liveVh);
-    if (liveTotalShift > currentShift) {
-      currentShift = liveTotalShift;
+    // final snap to exact end
+    const totalShift = getTotalShift();
+    if (totalShift > currentShift) {
+      currentShift = totalShift;
       inner.style.transition = "transform 0.5s ease";
       inner.style.transform = `translateY(-${currentShift}px)`;
     }
@@ -104,10 +123,11 @@ function type() {
 }
 
 function restart() {
-  inner.style.transition = "none";
-  inner.style.transform = "translateY(0)";
   typed = "";
   inner.textContent = "";
+  inner.style.transition = "none";
+  inner.style.transform = "translateY(0)";
+  autoShift = 0;
   currentShift = 0;
   i = 0;
   canScroll = true;
