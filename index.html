@@ -53,8 +53,9 @@ window.addEventListener("wheel", (e) => {
 }, { passive: true });
 window.addEventListener("touchstart", (e) => {
   touchStartY = e.touches[0].clientY;
-}, { passive: true });
+}, { passive: false });
 window.addEventListener("touchmove", (e) => {
+  e.preventDefault();
   const delta = touchStartY - e.touches[0].clientY;
   touchStartY = e.touches[0].clientY;
   const newShift = Math.max(0, currentShift + delta);
@@ -63,7 +64,7 @@ window.addEventListener("touchmove", (e) => {
   currentShift = newShift;
   inner.style.transition = "none";
   inner.style.transform = `translateY(-${currentShift}px)`;
-}, { passive: true });
+}, { passive: false });
 
 function getTotalShift() {
   const savedTransform = inner.style.transform;
